@@ -26,7 +26,8 @@ public class MainFrame extends JFrame {
 	private JFileChooser fileChooser = null;
 	private JCheckBoxMenuItem showAxisMenuItem;
 	private JCheckBoxMenuItem showMarkersMenuItem;
-	private JCheckBoxMenuItem showAltGraphicsMenuItem;
+	private JCheckBoxMenuItem showAltGraphicMenuItem;
+	private JCheckBoxMenuItem isRotatedMenuItem;
 	private GraphicsDisplay display = new GraphicsDisplay();
 	private boolean fileLoaded = false;
 	private boolean altFileLoaded = false;
@@ -41,7 +42,6 @@ public class MainFrame extends JFrame {
 		setJMenuBar(menuBar);
 		JMenu fileMenu = new JMenu("Файл");
 		menuBar.add(fileMenu);
-
 		Action openGraphicsAction = new AbstractAction("Открыть файл с графиком") {
 			public void actionPerformed(ActionEvent event) {
 				if (fileChooser == null) {
@@ -53,7 +53,6 @@ public class MainFrame extends JFrame {
 			}
 		};
 		fileMenu.add(openGraphicsAction);
-
 		Action openAltGraphicsAction = new AbstractAction("Открыть файл со вторым графиком") {
 			public void actionPerformed(ActionEvent event) {
 				if (fileChooser == null) {
@@ -65,7 +64,6 @@ public class MainFrame extends JFrame {
 			}
 		};
 		fileMenu.add(openAltGraphicsAction);
-
 		JMenu graphicsMenu = new JMenu("График");
 		menuBar.add(graphicsMenu);
 		Action showAxisAction = new AbstractAction("Показывать оси координат") {
@@ -84,19 +82,31 @@ public class MainFrame extends JFrame {
 		showMarkersMenuItem = new JCheckBoxMenuItem(showMarkersAction);
 		graphicsMenu.add(showMarkersMenuItem);
 		showMarkersMenuItem.setSelected(true);
-		Action showAltGraphicsAction = new AbstractAction("Показывать второй график") {
+		graphicsMenu.addMenuListener(new GraphicsMenuListener());
+		getContentPane().add(display, BorderLayout.CENTER);
+		Action showAltGraphicAction = new AbstractAction("Показывать второй график") {
 			public void actionPerformed(ActionEvent event) {
-				display.setShowAltGraphic(showAltGraphicsMenuItem.isSelected());
+				display.setShowAltGraphic(showAltGraphicMenuItem.isSelected());
 			}
 		};
-		showAltGraphicsMenuItem = new JCheckBoxMenuItem(showAltGraphicsAction);
-		graphicsMenu.add(showAltGraphicsMenuItem);
-		showAltGraphicsMenuItem.setSelected(true);
+		showAltGraphicMenuItem = new JCheckBoxMenuItem(showAltGraphicAction);
+		graphicsMenu.add(showAltGraphicMenuItem);
+		showAltGraphicMenuItem.setSelected(true);
+		graphicsMenu.addMenuListener(new GraphicsMenuListener());
+		getContentPane().add(display, BorderLayout.CENTER);
+		Action isRotatedAction = new AbstractAction("Повернуть график") {
+			public void actionPerformed(ActionEvent event) {
+				display.setIsRotated(isRotatedMenuItem.isSelected());
+			}
+		};
+		isRotatedMenuItem = new JCheckBoxMenuItem(isRotatedAction);
+		graphicsMenu.add(isRotatedMenuItem);
+		isRotatedMenuItem.setSelected(false);
 		graphicsMenu.addMenuListener(new GraphicsMenuListener());
 		getContentPane().add(display, BorderLayout.CENTER);
 	}
 
-	protected void openGraphics(File selectedFile, boolean isAlt) {
+	protected void openGraphics(File selectedFile, boolean alt) {
 		try {
 			DataInputStream in = new DataInputStream(new FileInputStream(selectedFile));
 			Double[][] graphicsData = new Double[in.available() / (Double.SIZE / 8) / 2][];
@@ -107,13 +117,12 @@ public class MainFrame extends JFrame {
 				graphicsData[i++] = new Double[] { x, y };
 			}
 			if (graphicsData != null && graphicsData.length > 0) {
-				if (!isAlt) {
+				fileLoaded = true;
+				if (!alt)
 					display.showGraphics(graphicsData);
-					fileLoaded = true;
-				}
 				else {
-					display.showAltGraphics(graphicsData);
 					altFileLoaded = true;
+					display.showAltGraphics(graphicsData);
 				}
 			}
 			in.close();
@@ -136,9 +145,9 @@ public class MainFrame extends JFrame {
 
 	private class GraphicsMenuListener implements MenuListener {
 		public void menuSelected(MenuEvent e) {
-			showAxisMenuItem.setEnabled(fileLoaded || altFileLoaded);
-			showMarkersMenuItem.setEnabled(fileLoaded || altFileLoaded);
-			showAltGraphicsMenuItem.setEnabled(altFileLoaded);
+			showAxisMenuItem.setEnabled(fileLoaded);
+			showMarkersMenuItem.setEnabled(fileLoaded);
+			showAltGraphicMenuItem.setEnabled(altFileLoaded);
 		}
 
 		public void menuDeselected(MenuEvent e) {

@@ -8,6 +8,7 @@ import java.awt.Graphics2D;
 import java.awt.Paint;
 import java.awt.Stroke;
 import java.awt.font.FontRenderContext;
+import java.awt.geom.AffineTransform;
 import java.awt.geom.Ellipse2D;
 import java.awt.geom.GeneralPath;
 import java.awt.geom.Line2D;
@@ -19,9 +20,11 @@ import javax.swing.JPanel;
 public class GraphicsDisplay extends JPanel {
 	private Double[][] graphicsData;
 	private Double[][] altGraphicsData;
+	private float[] dash = { 3, 1, 3, 1, 3, 1, 1, 1, 1, 1, 1, 1};
 	private boolean showAxis = true;
 	private boolean showMarkers = true;
 	private boolean showAltGraphic = false;
+	private boolean isRotated = false;
 	private double minX;
 	private double maxX;
 	private double minY;
@@ -31,7 +34,6 @@ public class GraphicsDisplay extends JPanel {
 	private BasicStroke altGraphicsStroke;
 	private BasicStroke axisStroke;
 	private BasicStroke markerStroke;
-	private float[] dash = { 3, 1, 3, 1, 3, 1, 1, 1, 1, 1, 1, 1 };
 	private Font axisFont;
 
 	public GraphicsDisplay() {
@@ -45,6 +47,7 @@ public class GraphicsDisplay extends JPanel {
 
 	public void showGraphics(Double[][] graphicsData) {
 		this.graphicsData = graphicsData;
+
 		repaint();
 	}
 
@@ -58,9 +61,9 @@ public class GraphicsDisplay extends JPanel {
 		this.showAxis = showAxis;
 		repaint();
 	}
-
-	public void setShowMarkers(boolean showMarkers) {
-		this.showMarkers = showMarkers;
+	
+	public void setIsRotated(boolean isRotated) {
+		this.isRotated = isRotated;
 		repaint();
 	}
 
@@ -69,42 +72,24 @@ public class GraphicsDisplay extends JPanel {
 		repaint();
 	}
 
+	public void setShowMarkers(boolean showMarkers) {
+		this.showMarkers = showMarkers;
+		repaint();
+	}
+
 	public void paintComponent(Graphics g) {
 		super.paintComponent(g);
 		if (graphicsData == null || graphicsData.length == 0)
 			return;
-		Double[] mmArr = detMinMax(graphicsData);
-		minX = mmArr[0];
-		maxX = mmArr[1];
-		minY = mmArr[2];
-		maxY = mmArr[3];
 
-		if (this.showAltGraphic) {
-			Double[] altMMArr = detMinMax(altGraphicsData);
-			if (minX > altMMArr[0])
-				minX = altMMArr[0];
-			if (maxX < altMMArr[1])
-				maxX = altMMArr[1];
-			if (minY > altMMArr[2])
-				minY = altMMArr[2];
-			if (maxY < altMMArr[3])
-				maxY = altMMArr[3];
-		}
-		
-		double scaleX = getSize().getWidth() / (maxX - minX);
-		double scaleY = getSize().getHeight() / (maxY - minY);
-		scale = Math.min(scaleX, scaleY);
-		if (scale == scaleX) {
-			double yIncrement = (getSize().getHeight() / scale - (maxY - minY)) / 2;
-			maxY += yIncrement;
-			minY -= yIncrement;
-		}
-		if (scale == scaleY) {
-			double xIncrement = (getSize().getWidth() / scale - (maxX - minX)) / 2;
-			maxX += xIncrement;
-			minX -= xIncrement;
-		}
+		getScale();
+
 		Graphics2D canvas = (Graphics2D) g;
+		if(isRotated) {
+			AffineTransform tform = canvas.getTransform();
+			tform.quadrantRotate(-1,getSize().getWidth()/2, getSize().getHeight()/2);
+			canvas.setTransform(tform);
+		}
 		Stroke oldStroke = canvas.getStroke();
 		Color oldColor = canvas.getColor();
 		Paint oldPaint = canvas.getPaint();
@@ -120,21 +105,53 @@ public class GraphicsDisplay extends JPanel {
 		canvas.setStroke(oldStroke);
 	}
 
-	protected Double[] detMinMax(Double[][] graphicsData) {
-		double minX = graphicsData[0][0];
-		double maxX = graphicsData[graphicsData.length - 1][0];
-		double minY = graphicsData[0][1];
-		double maxY = minY;
+	protected void getScale() {
+
+		Double[] mmdata = getMinMax(graphicsData);
+
+		minX = mmdata[0];
+		maxX = mmdata[1];
+		minY = mmdata[2];
+		maxY = mmdata[3];
+
+		if (this.showAltGraphic) {
+			Double[] altmmdata = getMinMax(altGraphicsData);
+			minX = Math.min(minX, altmmdata[0]);
+			maxX = Math.max(maxX, altmmdata[1]);
+			minY = Math.min(minY, altmmdata[2]);
+			maxY = Math.max(maxY, altmmdata[3]);
+		}
+		double scaleX = getSize().getWidth() / (maxX - minX);
+		double scaleY = getSize().getHeight() / (maxY - minY);
+		scale = Math.min(scaleX, scaleY);
+		if (scale == scaleX) {
+			double yIncrement = (getSize().getHeight() / scale - (maxY - minY)) / 2;
+			maxY += yIncrement;
+			minY -= yIncrement;
+		}
+		if (scale == scaleY) {
+			double xIncrement = (getSize().getWidth() / scale - (maxX - minX)) / 2;
+			maxX += xIncrement;
+			minX -= xIncrement;
+		}
+
+	}
+
+	protected Double[] getMinMax(Double[][] graphicsData) {
+		Double[] minmaxxy = {0.0,0.0,0.0,0.0};
+		minmaxxy[0] = graphicsData[0][0];
+		minmaxxy[1] = graphicsData[graphicsData.length - 1][0];
+		minmaxxy[2] = graphicsData[0][1];
+		minmaxxy[3] = minmaxxy[2];
 		for (int i = 1; i < graphicsData.length; i++) {
-			if (graphicsData[i][1] < minY) {
-				minY = graphicsData[i][1];
+			if (graphicsData[i][1] < minmaxxy[2]) {
+				minmaxxy[2] = graphicsData[i][1];
 			}
-			if (graphicsData[i][1] > maxY) {
-				maxY = graphicsData[i][1];
+			if (graphicsData[i][1] > minmaxxy[3]) {
+				minmaxxy[3] = graphicsData[i][1];
 			}
 		}
-		Double[] minMaxXY = { minX, maxX, minY, maxY };
-		return minMaxXY;
+		return minmaxxy;
 	}
 
 	protected void paintGraphics(Graphics2D canvas) {
@@ -150,60 +167,60 @@ public class GraphicsDisplay extends JPanel {
 			}
 		}
 		canvas.draw(graphics);
-
-		if (this.showAltGraphic) {
+		
+		if (showAltGraphic) {
 			canvas.setStroke(altGraphicsStroke);
 			canvas.setColor(Color.GREEN);
-			GeneralPath graphics2 = new GeneralPath();
+			GeneralPath altGraphics = new GeneralPath();
 			for (int i = 0; i < altGraphicsData.length; i++) {
 				Point2D.Double point = xyToPoint(altGraphicsData[i][0], altGraphicsData[i][1]);
 				if (i > 0) {
-					graphics2.lineTo(point.getX(), point.getY());
+					altGraphics.lineTo(point.getX(), point.getY());
 				} else {
-					graphics2.moveTo(point.getX(), point.getY());
+					altGraphics.moveTo(point.getX(), point.getY());
 				}
 			}
-			canvas.draw(graphics2);
-
+			canvas.draw(altGraphics);
 		}
 	}
 
 	protected void paintMarkers(Graphics2D canvas) {
 		canvas.setStroke(markerStroke);
-		paintFromData(graphicsData, canvas);
-		if (showAltGraphic)
-			paintFromData(altGraphicsData, canvas);
+		paintMarkersFromData(graphicsData,canvas);
+		if(showAltGraphic) {
+			paintMarkersFromData(altGraphicsData,canvas);
+		}
 	}
 
-	protected void paintFromData(Double[][] graphicsData, Graphics2D canvas) {
+	protected void paintMarkersFromData(Double[][] graphicsData, Graphics2D canvas) {
 		for (Double[] point : graphicsData) {
+			canvas.setColor(Color.RED);
+			if (sumLessThan10(point[1]))
+				canvas.setColor(Color.BLUE);
 			Ellipse2D.Double marker = new Ellipse2D.Double();
+			Point2D.Double center = xyToPoint(point[0], point[1]);
+			Point2D.Double corner = shiftPoint(center, 3, 3);
 			Line2D.Double line1 = new Line2D.Double();
 			Line2D.Double line2 = new Line2D.Double();
-
-			Point2D.Double center = xyToPoint(point[0], point[1]);
-			Point2D.Double corner = shiftPoint(center, 3.9, 3.9);
-
-			Point2D.Double point1 = shiftPoint(center, 3, 0);
-			Point2D.Double point2 = shiftPoint(center, -3, 0);
-
-			Point2D.Double point3 = shiftPoint(center, 0, 3);
-			Point2D.Double point4 = shiftPoint(center, 0, -3);
-
 			marker.setFrameFromCenter(center, corner);
-			line1.setLine(point3, point4);
-			line2.setLine(point1, point2);
-
-			if (numSum(point[1]))
-				canvas.setColor(Color.BLUE);
-			else
-				canvas.setColor(Color.RED);
-
+			line1.setLine(shiftPoint(center, 3, 0), shiftPoint(center, -3, 0));
+			line2.setLine(shiftPoint(center, 0, 3), shiftPoint(center, 0, -3));
 			canvas.draw(marker);
-			canvas.draw(line2);
 			canvas.draw(line1);
+			canvas.draw(line2);
 		}
-
+		
+	}
+	
+	protected boolean sumLessThan10(double y) {
+		int sum = 0;
+		int Y = (int) (y);
+		if(Y < 0) Y = -Y;
+		while (Y != 0) {
+			sum += Y % 10;
+			Y /= 10;
+		}
+		return sum < 10;
 	}
 
 	protected void paintAxis(Graphics2D canvas) {
@@ -253,15 +270,5 @@ public class GraphicsDisplay extends JPanel {
 		Point2D.Double dest = new Point2D.Double();
 		dest.setLocation(src.getX() + deltaX, src.getY() + deltaY);
 		return dest;
-	}
-
-	protected boolean numSum(Double y) {
-		int Y = (int) (double) (y);
-		int sum = 0;
-		while (Y > 0 && sum < 10) {
-			sum += Y % 10;
-			Y /= 10;
-		}
-		return sum < 10;
 	}
 }
